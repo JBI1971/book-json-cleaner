@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv
+venv/
+
+# Environment
+.env
+.env.*
+env.yml
+
+# IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Caches
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+
+# Output
+output/
+*.log

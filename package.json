@@ -1,0 +1,19 @@
+{
+  "name": "book-json-cleaner",
+  "version": "1.0.0",
+  "description": "Transform raw book JSON files into clean, structured formats with discrete content blocks suitable for EPUB generation.",
+  "main": "clean_input_json.py",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "clean": "python clean_input_json.py",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["json", "book", "epub", "cleaner", "parser"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@anthropic-ai/claude-code": "^2.0.31"
+  }
+}

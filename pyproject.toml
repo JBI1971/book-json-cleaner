@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "book-json-cleaner"
+version = "0.1.0"
+description = "Transform raw book JSON files into clean, structured formats with discrete content blocks"
+requires-python = ">=3.10"
+readme = "README.md"
+authors = [{ name = "Your Name" }]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["template_pkg*"]
