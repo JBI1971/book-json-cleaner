@@ -3,13 +3,48 @@ requires = ["setuptools>=75.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "book-json-cleaner"
-version = "0.1.0"
-description = "Transform raw book JSON files into clean, structured formats with discrete content blocks"
+name = "book-processing-toolkit"
+version = "0.2.0"
+description = "Complete toolkit for processing books: JSON cleaning, AI structuring, translation, footnotes, and EPUB generation"
 requires-python = ">=3.10"
 readme = "README.md"
 authors = [{ name = "Your Name" }]
+license = { text = "MIT" }
+keywords = ["book", "json", "epub", "translation", "nlp", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "httpx>=0.24.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "tenacity>=8.2.0",
+    "tqdm>=4.65.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+book-clean = "cli.clean:main"
+book-structure = "cli.structure:main"
+book-translate = "cli.translate:main"
+book-footnotes = "cli.footnotes:main"
+book-epub = "cli.build_epub:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
-include = ["template_pkg*"]
+include = ["processors*", "ai*", "utils*", "cli*"]

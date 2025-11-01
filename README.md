@@ -1,90 +1,161 @@
-# Book JSON Cleaner
+# Book Processing Toolkit
 
-Transform raw book JSON files into clean, structured formats with discrete content blocks suitable for EPUB generation.
+Complete toolkit for processing books through the entire pipeline: JSON cleaning, AI-powered structuring, translation, footnote generation, and EPUB building.
 
-## Overview
+## Vision: Full Book Processing Pipeline
 
-This tool takes any book JSON file and transforms it into a standardized, discrete block structure. Each paragraph, heading, and content element becomes a separately-addressable block with unique IDs for internal linking and EPUB compatibility.
+```
+Raw JSON → Clean → Structure → Translate → Footnotes → EPUB
+```
 
-**No API required** - Pure JSON transformation with instant processing.
+### Current Status
+
+✅ **JSON Cleaner** - Transform raw book JSON into discrete content blocks
+✅ **Content Structurer** - AI-powered semantic analysis (narrative, dialogue, etc.)
+🚧 **Translator** - Coming soon
+🚧 **Footnote Generator** - Coming soon
+🚧 **EPUB Builder** - Coming soon
 
 ## Quick Start
 
+### Installation
+
 ```bash
-python clean_input_json.py \
-  --input /path/to/book.json \
-  --output ./output/cleaned_book.json \
-  --language zh-Hant
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# For development
+pip install -r requirements-dev.txt
 ```
 
-**Output**: Structured JSON with discrete blocks, EPUB IDs, and auto-detected TOC
+### Usage
+
+#### 1. Clean JSON (No API Required)
+```bash
+python cli/clean.py --input book.json --output cleaned.json --language zh-Hant
+```
+
+#### 2. AI-Powered Structuring (Requires OPENAI_API_KEY)
+```bash
+export OPENAI_API_KEY=your-key-here
+python cli/structure.py --input cleaned.json --output structured.json
+```
+
+#### 3. Translation (Coming Soon)
+```bash
+python cli/translate.py --input structured.json --output translated.json --target-lang en
+```
+
+#### 4. Footnotes (Coming Soon)
+```bash
+python cli/footnotes.py --input translated.json --output with_footnotes.json
+```
+
+#### 5. Build EPUB (Coming Soon)
+```bash
+python cli/build_epub.py --input with_footnotes.json --output book.epub
+```
+
+## Project Structure
+
+```
+book-processing-toolkit/
+├── processors/              # Pipeline processors
+│   ├── json_cleaner.py         ✅ Clean raw JSON
+│   ├── content_structurer.py   ✅ AI semantic analysis
+│   ├── translator.py           🚧 Translation (placeholder)
+│   ├── footnote_generator.py   🚧 Footnotes (placeholder)
+│   └── epub_builder.py         🚧 EPUB (placeholder)
+│
+├── ai/                      # AI assistant management
+│   ├── assistant_manager.py    OpenAI assistant lifecycle
+│   └── assistants/             Stored assistant configs
+│
+├── utils/                   # Reusable utilities
+│   ├── clients/                API client wrappers
+│   │   ├── openai_client.py
+│   │   └── anthropic_client.py
+│   └── http/                   HTTP & web utilities
+│       ├── http.py             Retry logic
+│       └── parse.py            HTML parsing
+│
+├── cli/                     # Command-line interfaces
+│   ├── clean.py                JSON cleaning CLI
+│   ├── structure.py            Structuring CLI
+│   ├── translate.py            Translation CLI (placeholder)
+│   ├── footnotes.py            Footnotes CLI (placeholder)
+│   └── build_epub.py           EPUB CLI (placeholder)
+│
+├── schemas/                 # JSON schemas
+├── docs/                    # Documentation
+├── tests/                   # Test suite
+│
+├── requirements.txt         # Core dependencies
+├── requirements-dev.txt     # Dev dependencies
+└── README.md               # This file
+```
 
 ## Features
 
+### JSON Cleaner (Implemented)
+
 ✅ **Discrete Content Blocks** - Each paragraph/heading is a separate object
 ✅ **EPUB IDs** - Every block has unique ID for internal linking
-✅ **TOC Auto-Detection** - Automatically identifies table of contents
-✅ **Block Types** - heading_N, paragraph, text, list elements
-✅ **Source References** - Maintains traceability to original
-✅ **Fast Processing** - No API calls, processes instantly
+✅ **TOC Auto-Detection** - Identifies table of contents
+✅ **Block Types** - heading_1-6, paragraph, text, list elements
+✅ **Source References** - Maintains traceability
+✅ **Fast Processing** - No API calls, instant results
 
-## Main Tool
+### Content Structurer (Implemented)
 
-### `clean_input_json.py`
+✅ **Semantic Analysis** - Identifies narrative, dialogue, verse, etc.
+✅ **OpenAI Assistants** - Uses AI for content classification
+✅ **Batch Processing** - Multi-threaded with progress tracking
+✅ **Retry Logic** - Robust error handling
+✅ **Schema Validation** - Ensures output quality
+✅ **Chunking** - Handles large texts (>4000 chars)
 
-Transform raw JSON into discrete content blocks.
+### Translator (Planned)
 
-**Features:**
-- No API or external dependencies required
-- Instant processing (~1 second)
-- Auto-detects table of contents
-- Generates discrete blocks with EPUB IDs
-- Supports multiple input formats
+🚧 AI-powered translation
+🚧 Multi-language support
+🚧 Glossary integration
+🚧 Format preservation
 
-**Usage:**
+### Footnote Generator (Planned)
 
-```bash
-# Basic usage
-python clean_input_json.py --input book.json --output cleaned.json
+🚧 Cultural/historical notes
+🚧 Pronunciation guides (pinyin)
+🚧 Multiple citation styles
+🚧 Global deduplication
 
-# With language hint
-python clean_input_json.py \
-  --input book.json \
-  --output cleaned.json \
-  --language zh-Hant
+### EPUB Builder (Planned)
 
-# Quiet mode (no summary)
-python clean_input_json.py \
-  --input book.json \
-  --output cleaned.json \
-  --quiet
-```
-
-## Additional Tools
-
-The project includes additional tools for advanced processing:
-
-### `content_structuring_processor.py`
-AI-powered content structuring using OpenAI assistants. Identifies content block types (narrative, dialogue, verse, etc.) for more sophisticated categorization.
-
-Requires:
-- OpenAI API key
-- `translation_assistant_manager.py`
-
-See [TRANSLATION_ASSISTANT_MANAGER_GUIDE.md](TRANSLATION_ASSISTANT_MANAGER_GUIDE.md) for details.
+🚧 EPUB 3.0 generation
+🚧 Custom CSS styling
+🚧 Cover image support
+🚧 Navigation documents
+🚧 Internal linking via block IDs
 
 ## Output Format
 
-Both approaches produce the same structure:
+All processors maintain a consistent JSON structure:
 
 ```json
 {
   "meta": {
     "title": "Book Title",
-    "language": "zh-Hant"
+    "language": "zh-Hant",
+    "schema_version": "2.0.0"
   },
   "structure": {
-    "front_matter": { "toc": [...] },
+    "front_matter": {
+      "toc": [...]
+    },
     "body": {
       "chapters": [
         {
@@ -106,46 +177,66 @@ Both approaches produce the same structure:
 }
 ```
 
-## Example Output
+## Environment Variables
 
-After cleaning:
-```
-✓ 14 chapters
-✓ 677 discrete content blocks
-✓ TOC auto-detected
-✓ 462 KB cleaned_book.json
-```
-
-## Project Structure
-
-```
-agentic_test_project/
-├── clean_input_json.py                      # Main tool: JSON cleaner
-├── content_structuring_processor.py         # Optional: AI-powered structuring
-├── translation_assistant_manager.py         # Helper for content_structuring
-├── src/template_pkg/                        # Utilities library
-│   ├── clients/
-│   │   ├── openai_client.py                 # OpenAI API wrapper
-│   │   └── anthropic_client.py              # Anthropic API wrapper
-│   └── scraping/
-│       ├── http.py                          # HTTP utilities
-│       └── parse.py                         # HTML parsing
-├── output/                                  # Default output directory
-├── TRANSLATION_ASSISTANT_MANAGER_GUIDE.md   # Advanced tool guide
-└── README.md                                # This file
-```
-
-## Requirements
-
-### For basic JSON cleaning (clean_input_json.py):
 ```bash
-# No dependencies required! Pure Python 3.10+
+# Required for AI-powered features
+export OPENAI_API_KEY=your-openai-key
+
+# Optional: Alternative AI provider
+export ANTHROPIC_API_KEY=your-anthropic-key
 ```
 
-### For AI-powered structuring (content_structuring_processor.py):
+## Development
+
+### Run Tests
 ```bash
-pip install openai tqdm
+make test
+# or
+pytest
 ```
+
+### Code Formatting
+```bash
+black processors ai utils cli
+```
+
+### Linting
+```bash
+flake8 processors ai utils cli
+```
+
+## Documentation
+
+- **[CLAUDE.md](CLAUDE.md)** - Architecture guide for Claude Code
+- **[docs/AI_ASSISTANT_GUIDE.md](docs/AI_ASSISTANT_GUIDE.md)** - OpenAI assistant management
+
+## Roadmap
+
+### v0.2.0 (Current)
+- ✅ Restructured as toolkit
+- ✅ Created placeholders for future processors
+- ✅ Proper package structure
+- ✅ CLI entry points
+
+### v0.3.0 (Next)
+- 🚧 Implement translator processor
+- 🚧 Add language detection improvements
+- 🚧 Glossary/terminology support
+
+### v0.4.0 (Future)
+- 🚧 Implement footnote generator
+- 🚧 Citation style support (Chicago, MLA, APA)
+- 🚧 Cultural/historical annotations
+
+### v0.5.0 (Future)
+- 🚧 Implement EPUB builder
+- 🚧 Custom CSS themes
+- 🚧 Cover image integration
+
+## Contributing
+
+This project is under active development. Contributions welcome!
 
 ## License
 

@@ -1,16 +1,22 @@
 {
-  "name": "book-json-cleaner",
-  "version": "1.0.0",
-  "description": "Transform raw book JSON files into clean, structured formats with discrete content blocks suitable for EPUB generation.",
-  "main": "clean_input_json.py",
+  "name": "book-processing-toolkit",
+  "version": "0.2.0",
+  "description": "Complete toolkit for processing books: JSON cleaning, AI structuring, translation, footnotes, and EPUB generation.",
+  "main": "processors/json_cleaner.py",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "clean": "python clean_input_json.py",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "clean": "python cli/clean.py",
+    "structure": "python cli/structure.py",
+    "translate": "python cli/translate.py",
+    "footnotes": "python cli/footnotes.py",
+    "epub": "python cli/build_epub.py",
+    "test": "pytest",
+    "lint": "flake8 processors ai utils cli",
+    "format": "black processors ai utils cli"
   },
-  "keywords": ["json", "book", "epub", "cleaner", "parser"],
+  "keywords": ["book", "json", "epub", "translation", "nlp", "ai", "processing", "toolkit"],
   "author": "",
   "license": "MIT",
   "devDependencies": {
