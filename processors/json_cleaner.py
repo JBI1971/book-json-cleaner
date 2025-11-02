@@ -376,8 +376,15 @@ def main():
 
     parser.add_argument(
         '--output',
-        default=DEFAULT_OUTPUT_PATH,
+        default=None,
         help=f'Output cleaned JSON file (default: {DEFAULT_OUTPUT_PATH})'
+    )
+
+    parser.add_argument(
+        '--output-dir',
+        default=None,
+        help='Base output directory (e.g., /path/to/01_clean_json). '
+             'Will create subfolder matching source folder name.'
     )
 
     parser.add_argument(
@@ -394,11 +401,25 @@ def main():
     args = parser.parse_args()
 
     # Validate input
-    if not Path(args.input).exists():
+    input_path = Path(args.input)
+    if not input_path.exists():
         print(f"❌ Error: Input file not found: {args.input}")
         return 1
 
+    # Determine output path
+    if args.output:
+        output_path = Path(args.output)
+    elif args.output_dir:
+        # Auto-create output structure: output_dir/source_folder/cleaned_filename.json
+        source_folder = input_path.parent.name
+        output_filename = f"cleaned_{input_path.name}"
+        output_path = Path(args.output_dir) / source_folder / output_filename
+        print(f"📁 Auto-output structure: {source_folder}/{output_filename}")
+    else:
+        output_path = Path(DEFAULT_OUTPUT_PATH)
+
     print(f"📖 Loading book from: {args.input}")
+    print(f"💾 Will save to: {output_path}")
 
     # Clean the book
     try:
@@ -410,7 +431,6 @@ def main():
         return 1
 
     # Save output
-    output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -418,7 +438,7 @@ def main():
             json.dumps(cleaned_book, ensure_ascii=False, indent=2),
             encoding="utf-8"
         )
-        print(f"✓ Cleaned book saved to: {args.output}")
+        print(f"✓ Cleaned book saved to: {output_path}")
     except Exception as e:
         print(f"❌ Error saving output: {e}")
         return 1
@@ -430,7 +450,7 @@ def main():
 
     # File size
     import os
-    file_size = os.path.getsize(args.output)
+    file_size = os.path.getsize(output_path)
     print(f"\n💾 File size: {file_size:,} bytes ({file_size/1024:.1f} KB)")
 
     return 0

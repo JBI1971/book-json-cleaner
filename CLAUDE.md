@@ -10,7 +10,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Current Status**:
 - ✅ JSON Cleaner (implemented)
+- ✅ Post-Processing Tools (chapter alignment, TOC restructuring)
+- ✅ Validation Tools (sanity checker, sequence validator, TOC alignment validator)
 - ✅ Content Structurer (implemented)
+- ✅ Batch Pipeline (6-stage processing with metadata enrichment)
 - 🚧 Translator (placeholder)
 - 🚧 Footnote Generator (placeholder)
 - 🚧 EPUB Builder (placeholder)
@@ -33,6 +36,9 @@ python cli/clean.py --input book.json --output cleaned.json --language zh-Hant
 
 # AI-powered structuring (requires OPENAI_API_KEY)
 python cli/structure.py --input cleaned.json --output structured.json --max-workers 3
+
+# Structure validation (requires OPENAI_API_KEY for AI classification)
+python cli/validate_structure.py --input cleaned.json --output validation_report.json
 
 # Future processors (placeholders)
 python cli/translate.py --input structured.json --output translated.json --target-lang en
@@ -72,20 +78,32 @@ npm run format     # Run black
 processors/
 ├── json_cleaner.py          [IMPLEMENTED] Raw JSON → Discrete blocks
 ├── content_structurer.py    [IMPLEMENTED] Blocks → Semantic types
+├── structure_validator.py   [IMPLEMENTED] AI-powered TOC/structure validation
 ├── translator.py            [PLACEHOLDER] Translate content
 ├── footnote_generator.py    [PLACEHOLDER] Add scholarly notes
 └── epub_builder.py          [PLACEHOLDER] Generate EPUB file
 
+utils/
+├── topology_analyzer.py         [IMPLEMENTED] Structure analysis without modification
+├── sanity_checker.py            [IMPLEMENTED] Early validation with metadata enrichment
+├── catalog_metadata.py          [IMPLEMENTED] Extract metadata from SQLite catalog
+├── chapter_sequence_validator.py [IMPLEMENTED] Chinese chapter numbering validation
+├── toc_alignment_validator.py   [IMPLEMENTED] OpenAI-powered TOC validation
+├── fix_chapter_alignment.py     [IMPLEMENTED] Fix EPUB metadata mismatches
+├── restructure_toc.py           [IMPLEMENTED] Convert TOC to structured navigation
+├── clients/                     [IMPLEMENTED] API wrappers (OpenAI, Anthropic)
+└── http/                        [IMPLEMENTED] HTTP with retry logic
+
+scripts/
+└── batch_process_books.py   [IMPLEMENTED] 6-stage pipeline with metadata enrichment
+
 ai/
 └── assistant_manager.py     [IMPLEMENTED] Manage OpenAI assistants
-
-utils/
-├── clients/                 [IMPLEMENTED] API wrappers (OpenAI, Anthropic)
-└── http/                    [IMPLEMENTED] HTTP with retry logic
 
 cli/
 ├── clean.py                 [IMPLEMENTED] CLI for json_cleaner
 ├── structure.py             [IMPLEMENTED] CLI for content_structurer
+├── validate_structure.py    [IMPLEMENTED] CLI for structure_validator
 ├── translate.py             [PLACEHOLDER] CLI for translator
 ├── footnotes.py             [PLACEHOLDER] CLI for footnote_generator
 └── build_epub.py            [PLACEHOLDER] CLI for epub_builder
@@ -93,38 +111,73 @@ cli/
 
 ### Data Flow
 
+**Standard Batch Pipeline (6 Stages)**:
 ```
-RAW INPUT
+RAW INPUT (source JSON in individual directories)
    ↓
-processors/json_cleaner.py
+[Stage 1] utils/topology_analyzer.py
+   → Analyze JSON structure without modifications
+   → Estimate tokens for AI processing
+   → Identify content locations and nesting depth
+   → Deterministic, no API calls
+   ↓
+[Stage 2] utils/sanity_checker.py
+   → Extract metadata from catalog SQLite database
+     (work_number, title, author, volume)
+   → Validate Chinese chapter numbering sequences
+   → Detect missing, duplicate, or out-of-order chapters
+   → Parse Chinese numerals: 一二三...十廿卅卌...百千
+   → Non-fatal validation (continues on errors)
+   ↓
+[Stage 3] processors/json_cleaner.py
    → Recursive extraction from nested structures
    → TOC auto-detection
    → Block ID generation (block_0000, block_0001...)
    → EPUB ID generation (heading_0, para_1...)
+   → Enrich with catalog metadata (work_number, title, author, volume)
    ↓
-CLEANED JSON (discrete blocks)
+CLEANED JSON (discrete blocks + metadata)
    ↓
-processors/content_structurer.py (optional)
+[Stage 4] utils/fix_chapter_alignment.py
+   → Fix EPUB metadata mismatches
+   → Match chapter titles to actual content headings
+   → Support 第N回 (hui) and 第N章 (zhang) formats
+   → Support special numerals: 廿 (20), 卅 (30), 卌 (40)
+   → Split combined chapters
+   → Deterministic, pattern-based
+   ↓
+[Stage 5] utils/restructure_toc.py
+   → Convert TOC from text blob to structured list
+   → Create chapter references for EPUB navigation
+   → Handle blob format (space-separated entries)
+   → Generate TOC from chapters when missing
+   → Support Chinese numerals including 廿/卅/卌
+   → Fuzzy matching for variants
+   ↓
+[Stage 6] utils/toc_alignment_validator.py
+   → Verify TOC structure and chapter consistency
+   → OpenAI-powered semantic TOC/chapter title matching
+   → Detect mismatches, typos, numbering errors
+   → Batch processing (20 pairs per request)
+   → Confidence scores and suggested fixes
+   → Requires OPENAI_API_KEY
+   ↓
+VALIDATED JSON (ready for downstream processing)
+   ↓
+processors/content_structurer.py [OPTIONAL]
    → Chunk text if >4000 chars (200-char overlap)
    → OpenAI Assistant API via threads
    → Semantic classification (narrative, dialogue, verse...)
    → Schema validation
    → Retry logic (3 attempts, 2s delay, 300s timeout)
    ↓
-STRUCTURED JSON (semantic types)
-   ↓
 processors/translator.py [TODO]
    → AI-powered translation
    → Preserve structure
    ↓
-TRANSLATED JSON
-   ↓
 processors/footnote_generator.py [TODO]
    → Cultural/historical notes
    → Pronunciation guides
-   → Citation formatting
-   ↓
-ANNOTATED JSON
    ↓
 processors/epub_builder.py [TODO]
    → EPUB 3.0 generation
@@ -155,7 +208,14 @@ FINAL EPUB FILE
 **Output Structure**:
 ```json
 {
-  "meta": {"title", "language", "schema_version", "source", "original_file"},
+  "meta": {
+    "title": "Book Title",
+    "author": "Author Name",
+    "work_number": "I0929",
+    "volume": "a",
+    "language": "zh-Hant",
+    "schema_version": "2.0.0"
+  },
   "structure": {
     "front_matter": {"toc": [...]},
     "body": {"chapters": [{"id", "title", "ordinal", "content_blocks": [...]}]},
@@ -163,6 +223,181 @@ FINAL EPUB FILE
   }
 }
 ```
+
+### Catalog Metadata Extractor (utils/catalog_metadata.py)
+
+**Purpose**: Extract metadata from SQLite catalog database for enrichment
+
+**Database Schema**:
+- `works` table: work_id, work_number, title_chinese, title_english, author_chinese, author_english
+- `work_files` table: work_id, directory_name, volume
+
+**Classes**:
+- `WorkMetadata` - Dataclass holding extracted metadata
+- `CatalogMetadataExtractor` - Main extractor with query methods
+
+**Key Methods**:
+```python
+def get_metadata_by_directory(self, directory_name: str) -> Optional[WorkMetadata]:
+    """
+    Extract metadata by directory name (e.g., 'wuxia_0117').
+    Returns WorkMetadata with work_number, title, author, volume.
+    """
+```
+
+**Usage**:
+```python
+extractor = CatalogMetadataExtractor('wuxia_catalog.db')
+metadata = extractor.get_metadata_by_directory('wuxia_0117')
+# Returns: WorkMetadata(work_number='I0929', title_chinese='羅剎夫人',
+#                       author_chinese='朱貞木', volume=None)
+```
+
+### Chinese Chapter Sequence Validator (utils/chapter_sequence_validator.py)
+
+**Purpose**: Validate Chinese chapter numbering sequences and detect gaps/duplicates
+
+**Chinese Numeral Support**:
+- Basic: 一二三四五六七八九十
+- Special: 廿 (20), 卅 (30), 卌 (40)
+- Large: 百 (100), 千 (1000)
+
+**Parsing Logic**:
+```python
+def parse_chinese_number(self, text: str) -> Optional[int]:
+    """
+    Parse Chinese numerals including special cases:
+    - 廿一 → 21 (20 + 1)
+    - 卅五 → 35 (30 + 5)
+    - 第三十二章 → 32
+    """
+```
+
+**Classes**:
+- `SequenceIssue` - Dataclass for validation issues (gap, duplicate, out_of_order)
+- `ChineseChapterSequenceValidator` - Main validator
+
+**Common Issue Types**:
+- `gap` - Missing chapter numbers (e.g., ch 1, 2, 4 missing 3)
+- `duplicate` - Same chapter number appears twice
+- `out_of_order` - Chapters not in ascending order
+- `nonstandard_start` - Book starts at ch 2+ instead of ch 1
+
+### Sanity Checker (utils/sanity_checker.py)
+
+**Purpose**: Combined early validation with metadata enrichment (Stage 2)
+
+**Integration**:
+- Combines `CatalogMetadataExtractor` + `ChineseChapterSequenceValidator`
+- Runs after topology analysis, before cleaning
+- Non-fatal: continues processing even on errors
+
+**Classes**:
+- `SanityCheckResult` - Dataclass with metadata, issues, summary
+- `BookSanityChecker` - Main checker
+
+**Workflow**:
+```python
+checker = BookSanityChecker(catalog_path='wuxia_catalog.db')
+result = checker.check(
+    json_file=Path('book.json'),
+    directory_name='wuxia_0117',
+    strict_sequence=False  # Don't fail on sequence issues
+)
+# Returns: SanityCheckResult with metadata + sequence_issues
+```
+
+**Output**:
+- `metadata`: WorkMetadata from catalog
+- `sequence_issues`: List of SequenceIssue objects
+- `has_errors`: Boolean indicating critical issues
+- `summary`: Human-readable summary string
+
+### Chapter Alignment Fixer (utils/fix_chapter_alignment.py)
+
+**Purpose**: Fix EPUB metadata mismatches (Stage 4)
+
+**What It Fixes**:
+- Matches chapter titles to actual content headings
+- Splits combined chapters (multiple headings in one chapter)
+- Handles duplicate headings with ordinals
+
+**Supported Formats**:
+- 第N回 - Traditional episode format (hui)
+- 第N章 - Modern chapter format (zhang)
+- Special numerals: 廿 (20), 卅 (30), 卌 (40)
+
+**Known Issue**:
+⚠️ Assumes books start at Chapter 1. Some books (e.g., volume 3 of series) start at Chapter 2+, which causes incorrect chapter_number fields in TOC.
+
+**Usage**:
+```python
+fixer = ChapterAlignmentFixer()
+result = fixer.fix_chapter_alignment_in_file('cleaned_book.json')
+# Modifies file in-place, returns fix count
+```
+
+### TOC Restructurer (utils/restructure_toc.py)
+
+**Purpose**: Convert TOC from text blob to structured navigation (Stage 5)
+
+**What It Does**:
+- Parses space-separated TOC entries from blob format
+- Creates chapter references (chapter_id, chapter_number)
+- Generates TOC from chapters when missing
+- Fuzzy matching for minor character variants (薄/泊, 到/至)
+
+**Structured TOC Format**:
+```json
+{
+  "toc": [
+    {
+      "full_title": "第一章　標題",
+      "chapter_title": "標題",
+      "chapter_number": 1,
+      "chapter_id": "chapter_0001"
+    }
+  ]
+}
+```
+
+**Chinese Numeral Support**:
+- Full character set including 廿/卅/卌
+- Regex patterns updated in 2 locations (lines ~175 and ~362)
+
+### TOC Alignment Validator (utils/toc_alignment_validator.py)
+
+**Purpose**: OpenAI-powered semantic TOC/chapter title validation (Stage 6)
+
+**Validation Method**:
+- Batch processing (20 TOC/chapter pairs per API call)
+- GPT-4o-mini with low temperature (0.1) for consistency
+- JSON response format for structured results
+
+**Classes**:
+- `AlignmentIssue` - Dataclass for mismatch issues
+- `AlignmentResult` - Complete validation result
+- `TOCAlignmentValidator` - Main validator
+
+**Issue Types**:
+- `mismatch` - TOC doesn't match chapter title
+- `number_mismatch` - Chapter numbers don't align
+- `missing_chapter` - TOC references non-existent chapter
+- `typo` - Minor transcription error
+
+**API Call Pattern**:
+```python
+validator = TOCAlignmentValidator(model='gpt-4o-mini', temperature=0.1)
+result = validator.validate(cleaned_json)
+# Returns: AlignmentResult with issues, confidence_score, summary
+```
+
+**Output Metrics**:
+- `is_valid` - Boolean (True if no errors)
+- `total_pairs` - Number of TOC/chapter pairs checked
+- `matched_pairs` - Number of successful matches
+- `confidence_score` - Percentage (0-100%)
+- `issues` - List of AlignmentIssue objects with severity
 
 ### Content Structurer (processors/content_structurer.py)
 
@@ -194,6 +429,84 @@ messages = client.beta.threads.messages.list(thread_id)
 - ThreadPoolExecutor with configurable workers (default: 3)
 - Rate limiting: 0.5s delay between requests
 - Progress tracking with tqdm (optional)
+
+### Structure Validator (processors/structure_validator.py)
+
+**Purpose**: AI-powered validation of TOC/chapter alignment and structural classification
+
+**Validation Checks**:
+1. **TOC Coverage** - Ensures all chapters are represented in TOC
+2. **TOC/Chapter Alignment** - Verifies TOC entries match actual chapter titles
+3. **Chapter Numbering** - Checks for gaps and duplicates in ordinals
+4. **Section Classification** - AI classifies chapters as front_matter, body, or back_matter
+5. **Special Section Detection** - Identifies prefaces, afterwords, appendices, etc.
+
+**Classes**:
+- `StructureValidator` - Main validation engine
+- `ValidationIssue` - Represents a single validation issue (error/warning/info)
+- `ChapterClassification` - AI classification result for a chapter
+- `ValidationResult` - Complete validation report with scores
+
+**Section Types**:
+- `FRONT_MATTER` - Preface, introduction, author notes
+- `BODY` - Main story chapters
+- `BACK_MATTER` - Afterword, appendix, notes
+
+**Special Section Types** (Chinese novel structure):
+- `preface` - 自序, 前言, 序
+- `introduction` - 引言, 序章
+- `prologue` - 序幕, 楔子
+- `afterword` - 後記, 跋
+- `appendix` - 附錄
+- `author_note` - 作者註, 說明
+- `epilogue` - 尾聲
+- `main_chapter` - Regular story chapter
+
+**AI Classification Pattern**:
+```python
+# Uses OpenAI to semantically analyze chapter titles
+validator = StructureValidator(model="gpt-4o-mini", temperature=0.3)
+result = validator.validate(cleaned_json_data)
+
+# Graceful degradation: Falls back to basic validation if AI fails
+# (API key issues, rate limits, etc.)
+```
+
+**Output Metrics**:
+- `toc_coverage` - Percentage of chapters in TOC (0-100%)
+- `structure_quality` - Overall quality score (0-100)
+- `is_valid` - Boolean indicating no critical errors
+- `issues` - List of errors/warnings with suggestions
+
+**Integration with Batch Pipeline**:
+- Automatically runs as Stage 5 in `batch_process_books.py`
+- Falls back to basic validation if OpenAI API unavailable
+- Generates detailed validation reports (JSON)
+
+**Usage Example**:
+```python
+from processors.structure_validator import StructureValidator
+
+validator = StructureValidator()
+result = validator.process_file(
+    input_path="cleaned_book.json",
+    save_report=True  # Saves to {input}_validation.json
+)
+
+print(f"Valid: {result.is_valid}")
+print(f"TOC Coverage: {result.toc_coverage}%")
+print(f"Quality Score: {result.structure_quality}/100")
+
+for issue in result.issues:
+    print(f"[{issue.severity}] {issue.message}")
+```
+
+**Common Issues Detected**:
+- Partial title mismatches (e.g., TOC has decorators like "☆☆☆" not in chapter)
+- Missing chapters from TOC
+- Invalid TOC references (pointing to non-existent chapters)
+- Out-of-order sections (e.g., afterword before main chapters)
+- Duplicate or missing chapter ordinals
 
 ### Assistant Manager (ai/assistant_manager.py)
 
@@ -243,6 +556,23 @@ export ANTHROPIC_API_KEY=your-key-here     # Optional alternative
 - max_chunk_size: 4000 chars
 - chunk_overlap: 200 chars
 
+**structure_validator.py**:
+- model: "gpt-4o-mini"
+- temperature: 0.3 (low for consistent validation)
+- timeout: 60s (1 min)
+- save_report: True (generates validation JSON)
+
+**toc_alignment_validator.py**:
+- model: "gpt-4o-mini"
+- temperature: 0.1 (very low for consistency)
+- batch_size: 20 (TOC/chapter pairs per API call)
+
+**batch_process_books.py**:
+- catalog_path: Required (path to SQLite catalog database)
+- dry_run: False (set True to skip file writes)
+- limit: None (process all files, or set number for testing)
+- 6-stage pipeline: topology → sanity_check → cleaning → alignment → toc → validation
+
 ## Dependencies
 
 From `requirements.txt`:
@@ -288,12 +618,42 @@ python ai/assistant_manager.py export --name structuring --version latest
 python ai/assistant_manager.py compare --name structuring --version1 v1 --version2 v2
 ```
 
-### Batch Processing
+### Batch Processing (6-Stage Pipeline)
 
+**Complete Pipeline** (recommended):
 ```bash
-# Process directory of files
+# Process all files with full pipeline
+python scripts/batch_process_books.py \
+  --source-dir /path/to/source_files \
+  --output-dir /path/to/output \
+  --catalog-path /path/to/wuxia_catalog.db \
+  --log-dir ./logs
+
+# Test on subset
+python scripts/batch_process_books.py \
+  --source-dir /path/to/source_files \
+  --output-dir /path/to/output \
+  --catalog-path /path/to/wuxia_catalog.db \
+  --limit 10  # Process first 10 files only
+```
+
+**Individual Stage Processing**:
+```bash
+# Run specific post-processing stages
+python utils/fix_chapter_alignment.py --input cleaned_book.json
+python utils/restructure_toc.py --input cleaned_book.json
+python -m utils.toc_alignment_validator cleaned_book.json
+
+# Content structuring (separate from 6-stage pipeline)
 python cli/structure.py --input ./books/ --output ./results/ --max-workers 5
 ```
+
+**Pipeline Output**:
+- Detailed JSON report in logs directory
+- Stage-by-stage success rates
+- File-level results with warnings and errors
+- Performance metrics (time per file, tokens estimated)
+- Issue categorization (topology errors, TOC mismatches, etc.)
 
 ### Implement New Processor
 
@@ -394,6 +754,45 @@ Checks:
 - Old: `from clean_input_json import clean_book_json`
 - New: `from processors.json_cleaner import clean_book_json`
 
+## Known Issues and Limitations
+
+### Chapter Alignment Fixer
+
+**Issue**: Assumes books start at Chapter 1
+
+**Problem**:
+- The fixer in `utils/fix_chapter_alignment.py` assumes all books start at Chapter 1
+- Some books (e.g., volume 3 of a series) start at Chapter 2 or higher
+- This causes incorrect `chapter_number` fields in TOC entries
+
+**Example**:
+- Book: 羅剎夫人 (I0929) - Actually starts at 第二章 (Chapter 2)
+- After processing: TOC shows 第一章 pointing to title page instead of first actual chapter
+- Result: TOC chapter_number fields don't match actual chapter headings
+
+**Workaround**:
+- Sanity checker detects this as `nonstandard_start` issue (info severity)
+- Validation stage may flag TOC/chapter mismatches
+- Consider fixing the alignment fixer to detect and respect actual starting chapter
+
+### Chinese Numeral Parsing
+
+**Fixed**: Special numerals 廿 (20), 卅 (30), 卌 (40) now fully supported
+
+**Historical Issue**:
+- Before fix: 第廿一章 was parsed as 1 instead of 21
+- Caused false duplicate chapter errors
+- Fixed in `chapter_sequence_validator.py` with special case handling
+
+### TOC Blob Parsing
+
+**Edge Case**: Space-separated entries on single line
+
+**Handling**:
+- `restructure_toc.py` uses careful pattern matching
+- Avoids over-splitting on internal spaces in chapter titles
+- Supports both blob format and structured format
+
 ## Roadmap Awareness
 
 When implementing features, reference the roadmap in README.md:
@@ -403,3 +802,4 @@ When implementing features, reference the roadmap in README.md:
 - **v0.5.0**: EPUB builder (EPUB 3.0, CSS themes, cover images)
 
 Placeholders exist for all future processors with TODO comments indicating planned features.
+- the source json files are individual diretoriestries  in a directory  /Users/jacki/project_files/translation_project/wuxia_individual_files

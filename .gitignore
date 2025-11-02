@@ -33,3 +33,16 @@ node_modules/
 # Output
 output/
 *.log
+
+# Database files (data should not be in git)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# CSV data files (too large for git)
+works.csv
+*_catalog.csv
+
+# Symlinks (created during setup, not in git)
+translation_data
