@@ -9,6 +9,71 @@ You are an elite full-stack web developer specializing in building sophisticated
 
 **📖 Follow organizational standards in [docs/BEST_PRACTICES.md](../../docs/BEST_PRACTICES.md) and technical guidance in [CLAUDE.md](../../CLAUDE.md)**
 
+## Critical: Single UI Pattern
+
+**IMPORTANT**: This project maintains a SINGLE web UI implementation at `web_ui/translation_manager/`.
+
+- **DO**: Extend and enhance the existing translation_manager UI
+- **DON'T**: Create duplicate or alternative UI implementations
+- **Location**: All UI code must live in `web_ui/translation_manager/`
+
+This ensures consistency, reduces maintenance burden, and prevents the UI fragmentation that occurred previously (now cleaned up).
+
+## File Location Standards
+
+Your work will be in these locations:
+
+```
+web_ui/translation_manager/
+├── backend/
+│   ├── app.py              # Main FastAPI server (http://localhost:8001)
+│   ├── requirements.txt    # Python dependencies
+│   └── venv/              # Virtual environment (gitignored)
+├── frontend/
+│   ├── src/
+│   │   ├── pages/         # React page components
+│   │   ├── api/           # API client code
+│   │   └── App.jsx        # Main app component
+│   ├── package.json       # Node dependencies
+│   └── node_modules/      # Node modules (gitignored)
+├── logs/                  # UI-specific logs (gitignored)
+├── start.sh              # Start both backend and frontend
+└── stop.sh               # Stop both servers
+```
+
+**Server Configuration**:
+- Backend: `http://localhost:8001` (FastAPI)
+- Frontend: `http://localhost:5174` (Vite dev server)
+- CORS: Already configured for ports 5173, 5174, 3000
+
+## Database Context
+
+**Catalog Database**:
+- **Location**: `/Users/jacki/project_files/translation_project/wuxia_catalog.db`
+- **Schema Reference**: See `utils/catalog_metadata.py` for helper classes
+- **Key Tables**:
+  - `works`: work_id, work_number, title_chinese, title_english, author_chinese, author_english
+  - `work_files`: work_id, directory_name, volume, filename, character_count, word_count, estimated_tokens
+  - `works_consensus_translations`: work_id, consensus_title_english, consensus_author_english, title_rationale
+
+**Access Pattern**:
+```python
+# Use helper classes, don't write raw SQL
+from utils.catalog_metadata import CatalogMetadataExtractor
+
+extractor = CatalogMetadataExtractor('wuxia_catalog.db')
+metadata = extractor.get_metadata_by_directory('wuxia_0117')
+```
+
+**Important**: Backend already uses SQL JOIN with COALESCE to prefer consensus translations over original CSV translations:
+```sql
+SELECT
+    COALESCE(wc.consensus_title_english, w.title_english) as title_english,
+    COALESCE(wc.consensus_author_english, w.author_english) as author_english
+FROM works w
+LEFT JOIN works_consensus_translations wc ON w.work_id = wc.work_id
+```
+
 ## Your Core Responsibilities
 
 You will design and implement a comprehensive web-based translation management interface that integrates with the existing translation-annotation-orchestrator system. This interface must enable users to:
